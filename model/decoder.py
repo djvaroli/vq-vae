@@ -27,7 +27,7 @@ class Decoder(nn.Module):
         self.residual_module = Residual(
             wrapped_module=default_residual_module(
                 in_channels=hidden_layer_channels,
-                residual_hidden_layer_channels=residual_hidden_layer_channels
+                residual_hidden_layer_channels=residual_hidden_layer_channels,
             )
         )
         self.residual_stack = ResidualStack(n_residual_layers, self.residual_module)
@@ -55,7 +55,7 @@ class Decoder(nn.Module):
         outputs = self.conv1(inputs)
 
         outputs = self.residual_stack(outputs)
-        
+
         outputs = self.conv_tr1(outputs)
         outputs = self.hidden_activation_fn(outputs)
 

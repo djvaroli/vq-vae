@@ -39,15 +39,15 @@ class VectorQuantizer(nn.Module):
     @property
     def codebook_vectors(self) -> torch.Tensor:
         return self.codebook.weight.data
-    
+
     def measure_distance(self, vectors: torch.Tensor) -> torch.Tensor:
-        """Returns a tensor of shape (n_input_vectors, n_codebook_vectors) 
+        """Returns a tensor of shape (n_input_vectors, n_codebook_vectors)
         of pairwise distances between every input vector and every codebook vector.
         """
         return self._distance_f(vectors, self.codebook.weight)
 
     def index_vectors(self, vectors: torch.Tensor) -> torch.Tensor:
-        """Returns the indices of the code vectors that are closest to the 
+        """Returns the indices of the code vectors that are closest to the
         input vectors.
         """
         # measure the distance between each input vector and each code vector

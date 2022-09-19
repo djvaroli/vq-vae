@@ -4,7 +4,7 @@ import torch
 from torch import nn
 
 
-class CommitmentLoss(nn.Module):
+class QuantizationLoss(nn.Module):
     def __init__(self, commitment_term: float) -> None:
         super().__init__()
         self.commitment_term = commitment_term

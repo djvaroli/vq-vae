@@ -19,7 +19,13 @@ def default_residual_module(
             bias=False,
         ),
         nn.ReLU(True),
-        nn.Conv2d(residual_hidden_layer_channels, in_channels, kernel_size=1, stride=1, bias=False),
+        nn.Conv2d(
+            residual_hidden_layer_channels,
+            in_channels,
+            kernel_size=1,
+            stride=1,
+            bias=False,
+        ),
     )
     return module
 

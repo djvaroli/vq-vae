@@ -43,7 +43,7 @@ class Encoder(nn.Module):
         self.residual_module = Residual(
             wrapped_module=default_residual_module(
                 in_channels=hidden_layer_channels,
-                residual_hidden_layer_channels=residual_hidden_layer_channels
+                residual_hidden_layer_channels=residual_hidden_layer_channels,
             )
         )
         self.residual_stack = ResidualStack(n_residual_layers, self.residual_module)
