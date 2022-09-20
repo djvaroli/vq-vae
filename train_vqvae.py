@@ -1,4 +1,4 @@
-from multiprocessing.resource_sharer import stop
+from ast import parse
 import typing as t
 from argparse import ArgumentParser
 from enum import Enum
@@ -19,6 +19,7 @@ class DataloaderOptions(Enum):
 
 
 def train_vqvae(
+    n_epochs: int
 ):
     if torch.cuda.is_available():
         device = torch.device("cuda:0")
@@ -28,8 +29,6 @@ def train_vqvae(
         device = torch.device("cpu")
     
     print(f'Using device: {device}.')
-
-    n_epochs = 2
 
     project_name = os.environ["NEPTUNE_PROJECT_NAME"]
     api_token = os.environ["NEPTUNE_API_TOKEN"]
@@ -62,4 +61,8 @@ def train_vqvae(
     run.stop()
 
 if __name__ == "__main__":
-    train_vqvae()
+    parser = ArgumentParser()
+    parser.add_argument("-e", "--n_epochs", required=True, type=int, help="Number of epochs to train model for.")
+    args = parser.parse_args()
+
+    train_vqvae(n_epochs=args.n_epochs)
