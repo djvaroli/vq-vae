@@ -1,6 +1,3 @@
-from ctypes.wintypes import HDC
-from turtle import forward
-
 import torch
 from torch import nn
 
