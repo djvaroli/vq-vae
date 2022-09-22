@@ -6,7 +6,7 @@ from torch import nn
 import numpy as np
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
-
+from neptune.new.metadata_containers.run import Run
 from .loss import QuantizationLoss
 from .model import VQVAE
 
@@ -26,8 +26,9 @@ class VQVAETrainer:
         self.quantization_loss_fn = quantization_loss_fn
         self.reconstruction_loss_fn = reconstruction_loss_fn
         self.metric_update_steps = metric_update_steps
-        self.device = device
-        self.model.to(self.device)
+        
+        self.set_training_device(device)
+
         self.quantization_loss_history = deque()
         self.reconstruction_loss_history = deque()
         self.loss_history = deque()
@@ -40,7 +41,8 @@ class VQVAETrainer:
         self, 
         dataloader: DataLoader,
         progress_bar: tqdm,
-        scale_reconstruction_loss: bool = True
+        scale_reconstruction_loss: bool = True,
+        run: t.Optional[Run] = None
     ):
         for batch_idx, data_batch in enumerate(dataloader):
             if not isinstance(data_batch, torch.Tensor):
@@ -64,16 +66,23 @@ class VQVAETrainer:
                 reconstruction_loss /= np.var(dataloader.dataset.data / 255.0)
 
             loss = reconstruction_loss + quantization_loss
+
             loss.backward()
             self.optimizer.step()
             
             progress_bar.update()
 
+            reconstruction_loss_np = reconstruction_loss.detach().cpu().numpy()
+            quantization_loss_np = quantization_loss.detach().cpu().numpy()
             if batch_idx % self.metric_update_steps == 0:
                 progress_bar.set_postfix(dict(
-                    ReconstructionLoss=reconstruction_loss.detach().cpu().numpy(),
-                    QuantizationLoss=quantization_loss.detach().cpu().numpy()
+                    ReconstructionLoss=reconstruction_loss_np,
+                    QuantizationLoss=quantization_loss_np
                 ))
+            
+            if run:
+                run["train/ReconstructionLoss"].log(reconstruction_loss_np)
+                run["train/QuantizationLoss"].log(quantization_loss_np)
             
             self.quantization_loss_history.append(quantization_loss.detach().cpu().numpy())
             self.reconstruction_loss_history.append(reconstruction_loss.detach().cpu().numpy())
