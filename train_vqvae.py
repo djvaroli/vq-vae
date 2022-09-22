@@ -47,7 +47,7 @@ def train_vqvae(
     run_parameters = TrainingParameters(
         dataset_name="CIFAR10",
         n_epochs=n_epochs,
-        deivce_id=device_id,
+        device_id=device_id,
         seed=seed
     )
     dataloader = DataloaderOptions[run_parameters.dataset_name].value()
