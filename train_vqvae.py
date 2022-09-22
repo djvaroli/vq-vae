@@ -68,7 +68,7 @@ def train_vqvae(
     for epoch in range(1, n_epochs + 1):
         progress_bar = tqdm(total=len(dataloader))
         progress_bar.set_description(f"Epoch {epoch} / {n_epochs}")
-        trainer._train_single_epoch(dataloader, progress_bar, run)
+        trainer._train_single_epoch(dataloader, progress_bar, run=run)
 
         test_reconstructions = model(test_samples).detach().cpu()
         test_reconstructions_grid = make_grid(test_reconstructions, nrow=4).permute(1, 2, 0).numpy()

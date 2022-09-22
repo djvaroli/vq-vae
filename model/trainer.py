@@ -80,9 +80,9 @@ class VQVAETrainer:
                     QuantizationLoss=quantization_loss_np
                 ))
             
-            if run:
-                run["train/ReconstructionLoss"].log(reconstruction_loss_np)
-                run["train/QuantizationLoss"].log(quantization_loss_np)
+            if run is not None:
+                run["train/ReconstructionLoss"].log(float(reconstruction_loss_np))
+                run["train/QuantizationLoss"].log(float(quantization_loss_np))
             
             self.quantization_loss_history.append(quantization_loss.detach().cpu().numpy())
             self.reconstruction_loss_history.append(reconstruction_loss.detach().cpu().numpy())
