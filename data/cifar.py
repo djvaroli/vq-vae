@@ -1,4 +1,5 @@
 import typing as t
+from enum import Enum
 
 import torch
 import torchvision.datasets as datasets
@@ -7,6 +8,26 @@ import numpy as np
 
 from torch.utils.data import DataLoader
 
+
+def _tanh_transform(n_channels: int):
+    means = tuple(0.5 for _ in range(n_channels))
+    std = tuple(0.5 for _ in range(n_channels))
+
+    return transforms.Compose([transforms.ToTensor(), transforms.Normalize(means, std)])
+
+
+def _half_step_transform(n_channels: int):
+    means = tuple(0.5 for _ in range(n_channels))
+    std = tuple(1.0 for _ in range(n_channels))
+
+    return transforms.Compose([transforms.ToTensor(), transforms.Normalize(means, std)])
+
+
+class ImageDatasetTransforms(Enum):
+    TANH_RGB = _tanh_transform(3)
+    TANH_BW = _tanh_transform(1)
+    HALF_RGB = _half_step_transform(3)
+    HALF_BW = _half_step_transform(1)
 
 
 class CIFAR10DataLoader(DataLoader):
@@ -18,17 +39,12 @@ class CIFAR10DataLoader(DataLoader):
         pin_memory: bool = True,
         train: bool = True,
         data_root: str = "downloaded_datasets",
+        transforms: t.Optional[ImageDatasetTransforms] = None,
         generator=None,
-    ):  
+    ):
 
         dataset = datasets.CIFAR10(
-            root=data_root, 
-            train=train, 
-            download=True,
-            transform=transforms.Compose([
-                transforms.ToTensor(),
-                transforms.Normalize((0.5,0.5,0.5), (1.0,1.0,1.0))
-            ])
+            root=data_root, train=train, download=True, transform=transforms
         )
 
         super().__init__(
@@ -37,12 +53,14 @@ class CIFAR10DataLoader(DataLoader):
             shuffle=shuffle,
             num_workers=n_workers,
             pin_memory=pin_memory,
-            generator=generator
+            generator=generator,
         )
 
-    def get_sample_images(self, n_samples: int = 1, seed: t.Optional[int] = None) -> torch.Tensor:        
-        rng = np.random.default_rng(seed=seed)
-        n_total_samples = len(self.dataset.data)
-        selected_indices = rng.choice(range(n_total_samples), size=n_samples, replace=False)
-        sample_image_tensor = torch.from_numpy(self.dataset.data[selected_indices, :, :, :]).float()
-        return sample_image_tensor.permute(0, 3, 1, 2)
+    def get_sample_images(
+        self, n_samples: int = 1, seed: t.Optional[int] = None
+    ) -> torch.Tensor:
+        iterator = iter(self)
+        if seed:
+            torch.manual_seed(seed)
+        next_batch = next(iterator)[0]
+        return next_batch[:n_samples]

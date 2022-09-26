@@ -12,57 +12,50 @@ class VQVAE(nn.Module):
     def __init__(
         self,
         img_channels: int,
-        n_codes: int = 512,
-        code_vector_dim: int = 64,
-        encoder_latent_dim: int = 128,
-        encoder_residual_latent_dim: int = 32,
-        encoder_n_residual_layers: int = 2,
-        encoder_hidden_activation_fn: nn.Module = nn.ReLU(),
-        decoder_latent_dim: int = 128,
-        decoder_residual_latent_dim: int = 32,
-        decoder_n_residual_layers: int = 2,
-        decoder_hidden_activation_fn: nn.Module = nn.ReLU(),
-    ) -> None:
-        super().__init__()
+        hidden_dim: int = 128,
+        n_residual_layers: int = 2,
+        residual_layer_hidden_dim: int = 32,
+        n_embeddings: int = 512,
+        embedding_dim: int = 64,
+        hidden_activation_fn: nn.Module = nn.ReLU(),
+        ema_decay: float = 0.0,
+    ):
+        """Initializes the VQ-VAE.
+
+        Args:
+            img_channels (int): number of channels in the input images.
+            hidden_dim (int, optional): hidden dimension of the model.. Defaults to 128.
+            n_residual_layers (int, optional): number of layers in the residual stack. Defaults to 2.
+            residual_layer_hidden_dim (int, optional): hidden dimension of each residual layer. Defaults to 32.
+            n_embeddings (int, optional): number of 'codes' in the codebook. Defaults to 512.
+            embedding_dim (int, optional): dimension of eaach code in the codebook. Defaults to 64.
+            hidden_activation_fn (nn.Module, optional): activation function used in hidden layers. Defaults to nn.ReLU().
+            ema_decay (float, optional): ema decay. If not 0, then EMA vector quantization layer will be used.
+        """
+        super(VQVAE, self).__init__()
 
         self.encoder = Encoder(
-            img_channels,
-            encoder_latent_dim,
-            encoder_residual_latent_dim,
-            encoder_n_residual_layers,
-            encoder_hidden_activation_fn,
+            img_channels, hidden_dim, n_residual_layers, residual_layer_hidden_dim, hidden_activation_fn
         )
-        self.pre_codebook_conv = nn.Conv2d(
-            in_channels=encoder_latent_dim,
-            out_channels=code_vector_dim,
-            kernel_size=1,
-            stride=1,
+        self.pre_quantizer_conv = nn.Conv2d(
+            in_channels=hidden_dim, out_channels=embedding_dim, kernel_size=1, stride=1
         )
-        self.quantizer = VectorQuantizer(n_codes, code_vector_dim)
+        self.quantizer = VectorQuantizer(n_embeddings, embedding_dim)
         self.decoder = Decoder(
-            code_vector_dim,
-            decoder_latent_dim,
-            decoder_residual_latent_dim,
-            decoder_n_residual_layers,
-            decoder_hidden_activation_fn,
-            out_channels=img_channels,
+            embedding_dim, hidden_dim, n_residual_layers, residual_layer_hidden_dim, hidden_activation_fn
         )
-
-        self._is_compiled = False
-        self._commitment_loss_fn: nn.Module
-        self._reconstruction_loss_fn: nn.Module
-
+    
     @property
     def n_codes(self) -> int:
-        return self.quantizer.n_codes
+        return self.quantizer.n_embeddings
 
     @property
     def code_vector_dim(self) -> int:
-        return self.quantizer.code_vector_dim
+        return self.quantizer.embedding_dim
 
     @property
     def codebook_vectors(self) -> torch.Tensor:
-        return self.quantizer.codebook_vectors
+        return self.quantizer.codebook.weight.data.detach()
 
     def get_code_vectors(self, indices: torch.Tensor) -> torch.Tensor:
         indices = indices.to(self.codebook_vectors.device)
@@ -81,33 +74,13 @@ class VQVAE(nn.Module):
 
         return code_vectors
 
-    def _index(self, inputs: torch.Tensor) -> torch.Tensor:
-        batch_size = inputs.shape[0]
-        flat_inputs = inputs.view((-1, self.code_vector_dim))
-        code_vector_indices = self.quantizer.index_vectors(flat_inputs)
-        return code_vector_indices.view((batch_size, -1))
+    def forward(self, x):
+        z = self.encoder(x)
+        z: torch.Tensor = self.pre_quantizer_conv(z)
 
-    def index(self, inputs: torch.Tensor) -> torch.Tensor:
-        encoded = self.encode(inputs)
-        return self._index(encoded)
+        z: torch.Tensor = z.permute(0, 2, 3, 1).contiguous()
+        quantized, _ = self.quantizer(z)
+        quantized = z + (quantized - z).detach()
+        quantized = quantized.permute(0, 3, 1, 2)
 
-    def encode(
-        self,
-        inputs: torch.Tensor,
-    ) -> torch.Tensor:
-        pre_quantized = self.pre_codebook_conv(self.encoder(inputs))
-        return pre_quantized
-
-    def encode_and_quantize(self, inputs: torch.Tensor) -> torch.Tensor:
-        return self.quantize(self.encode(inputs))
-
-    def quantize(self, inputs: torch.Tensor) -> torch.Tensor:
-        return self.quantizer(inputs)
-
-    def decode(self, inputs: torch.Tensor) -> torch.Tensor:
-        return self.decoder(inputs)
-
-    def forward(self, inputs: torch.Tensor):
-        encoded = self.encode(inputs)
-        quantized = self.quantize(encoded)
-        return self.decode(quantized)
+        return self.decoder(quantized)

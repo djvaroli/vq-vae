@@ -32,27 +32,22 @@ class TrainingParameters:
 
 
 def train_vqvae(
-    n_epochs: int,
-    device_id: str,
-    batch_size: int,
-    seed: t.Optional[int] = None
+    n_epochs: int, device_id: str, batch_size: int, seed: t.Optional[int] = None
 ):
     device = torch.device(device_id)
-    
-    print(f'Using device: {device}.')
 
-    run = neptune.init(
-        project=NEPTUNE_PROJECT_NAME,
-        api_token=NEPTUNE_API_TOKEN
-    )
+    print(f"Using device: {device}.")
+
+    run = neptune.init(project=NEPTUNE_PROJECT_NAME, api_token=NEPTUNE_API_TOKEN)
 
     run_parameters = TrainingParameters(
         dataset_name="CIFAR10",
         n_epochs=n_epochs,
         device_id=device_id,
         batch_size=batch_size,
-        seed=seed
+        seed=seed,
     )
+
     dataloader = DataloaderOptions[run_parameters.dataset_name].value(
         batch_size=run_parameters.batch_size
     )
@@ -60,14 +55,16 @@ def train_vqvae(
 
     run["parameters"] = run_parameters.__dict__
 
-    model = VQVAE(3)
+    model = VQVAE(img_channels=3)
     model.to(device)
     trainer = VQVAETrainer(model, optimizer_factory, device=device)
 
     test_samples = dataloader.get_sample_images(8, seed=run_parameters.seed).to(device)
 
     test_reconstructions = model(test_samples).detach().cpu()
-    test_reconstructions_grid = make_grid(test_reconstructions, nrow=4).permute(1, 2, 0).numpy()
+    test_reconstructions_grid = (
+        make_grid(test_reconstructions, nrow=4).permute(1, 2, 0).numpy()
+    )
 
     run["reconstruction-epoch-0"].log(File.as_image(test_reconstructions_grid))
 
@@ -77,23 +74,44 @@ def train_vqvae(
         trainer._train_single_epoch(dataloader, progress_bar, run=run)
 
         test_reconstructions = model(test_samples).detach().cpu()
-        test_reconstructions_grid = make_grid(test_reconstructions, nrow=4).permute(1, 2, 0).numpy()
+        test_reconstructions_grid = (
+            make_grid(test_reconstructions, nrow=4).permute(1, 2, 0).numpy()
+        )
 
-        run[f"reconstruction-epoch-{epoch}"].log(File.as_image(test_reconstructions_grid))
-    
+        run[f"reconstruction-epoch-{epoch}"].log(
+            File.as_image(test_reconstructions_grid)
+        )
+
     run.stop()
+
 
 if __name__ == "__main__":
     parser = ArgumentParser()
-    parser.add_argument("-e", "--n_epochs", required=True, type=int, help="Number of epochs to train model for.")
-    parser.add_argument("-d", "--device_id", required=True, type=str, help="Device to run model training on.")
-    parser.add_argument("-b", "--batch_size", type=int, default=128, help="Size of each training batch.")
-    parser.add_argument("--seed", type=int, default=None, help="Random seed for stochastic operations.")
+    parser.add_argument(
+        "-e",
+        "--n_epochs",
+        required=True,
+        type=int,
+        help="Number of epochs to train model for.",
+    )
+    parser.add_argument(
+        "-d",
+        "--device_id",
+        required=True,
+        type=str,
+        help="Device to run model training on.",
+    )
+    parser.add_argument(
+        "-b", "--batch_size", type=int, default=256, help="Size of each training batch."
+    )
+    parser.add_argument(
+        "--seed", type=int, default=None, help="Random seed for stochastic operations."
+    )
     args = parser.parse_args()
 
     train_vqvae(
         n_epochs=args.n_epochs,
         device_id=args.device_id,
         seed=args.seed,
-        batch_size=args.batch_size
+        batch_size=args.batch_size,
     )

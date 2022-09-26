@@ -1,58 +1,60 @@
-from turtle import forward
-
 import torch
 from torch import nn
 
-
-def default_residual_module(
-    in_channels: int,
-    residual_hidden_layer_channels: int,
-) -> nn.Sequential:
-    module = nn.Sequential(
-        nn.ReLU(True),
-        nn.Conv2d(
-            in_channels,
-            out_channels=residual_hidden_layer_channels,
-            kernel_size=3,
-            stride=1,
-            padding=1,
-            bias=False,
-        ),
-        nn.ReLU(True),
-        nn.Conv2d(
-            residual_hidden_layer_channels,
-            in_channels,
-            kernel_size=1,
-            stride=1,
-            bias=False,
-        ),
-    )
-    return module
+import torch.nn.functional as F
 
 
 class Residual(nn.Module):
-    def __init__(self, wrapped_module: nn.Module) -> None:
-        super().__init__()
-        self.wrapped_module = wrapped_module
+    def __init__(
+        self,
+        in_channels: int,
+        hidden_dim: int,
+        hidden_activation_fn: nn.Module = nn.ReLU(True)
+    ):
+        super(Residual, self).__init__()
+        self._block = nn.Sequential(
+            hidden_activation_fn,
+            nn.Conv2d(
+                in_channels=in_channels,
+                out_channels=hidden_dim,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+                bias=False,
+            ),
+            hidden_activation_fn,
+            nn.Conv2d(
+                in_channels=hidden_dim,
+                out_channels=in_channels,
+                kernel_size=1,
+                stride=1,
+                bias=False,
+            ),
+        )
 
-    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
-        return inputs + self.wrapped_module(inputs)
+    def forward(self, x) -> torch.Tensor:
+        return x + self._block(x)
 
 
 class ResidualStack(nn.Module):
     def __init__(
         self,
-        n_layers: int,
-        residual_module: Residual,
-        output_activation: nn.Module = nn.ReLU(),
-    ) -> None:
-        super().__init__()
-        self.n_layers = n_layers
-        self.residual_stack = nn.ModuleList([residual_module for _ in range(n_layers)])
-        self.output_activation = output_activation
+        in_channels: int,
+        hidden_dim: int,
+        n_residual_layers: int,
+        hidden_activation_fn: nn.Module = nn.ReLU()
+    ):
+        super(ResidualStack, self).__init__()
+        self.n_residual_layers = n_residual_layers
+        self.layers = nn.ModuleList(
+            [
+                Residual(in_channels, hidden_dim)
+                for _ in range(self.n_residual_layers)
+            ]
+        )
+        self.hidden_activation_fn = hidden_activation_fn
 
-    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
-        output = inputs
-        for residual_layer in self.residual_stack:
-            output = residual_layer(output)
-        return self.output_activation(output)
+    def forward(self, x) -> torch.Tensor:
+        for layer in self.layers:
+            x = layer(x)
+        return self.hidden_activation_fn(x)

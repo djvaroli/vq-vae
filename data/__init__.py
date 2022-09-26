@@ -1,1 +1,1 @@
-from .cifar import CIFAR10DataLoader
+from .cifar import CIFAR10DataLoader, ImageDatasetTransforms
