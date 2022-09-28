@@ -11,7 +11,7 @@ class VectorQuantizer(nn.Module):
         self,
         n_embeddings: int,
         embedding_dim: int,
-        distance_fn: nn.Module = EuclidianCodebookDistance()
+        distance_fn: nn.Module = EuclidianCodebookDistance(),
     ):
         super(VectorQuantizer, self).__init__()
 
@@ -52,3 +52,68 @@ class VectorQuantizer(nn.Module):
         quantized = torch.matmul(encodings, self.codebook.weight).view(input_shape)
 
         return quantized, encodings
+
+
+class EMAVectorQuantizer(VectorQuantizer):
+    def __init__(
+        self,
+        n_embeddings: int,
+        embedding_dim: int,
+        decay: float,
+        epsilon: float = 1e-5,
+        distance_fn: nn.Module = EuclidianCodebookDistance(),
+    ):
+        super().__init__(n_embeddings, embedding_dim, distance_fn)
+
+        self.codebook.weight.data.normal_()
+
+        self.register_buffer("ema_cluster_size", torch.zeros(n_embeddings))
+        self.ema_w = nn.Parameter(torch.Tensor(n_embeddings, embedding_dim))
+        self.ema_w.data.normal_()
+
+        self.decay = decay
+        self.epsilon = epsilon
+
+    def forward(self, inputs: torch.Tensor) -> t.Tuple[torch.Tensor, torch.Tensor]:
+        # expects that inputs have shape (B, H, W, C) and are contiguous in memory
+        quantized, encodings = super().forward(inputs)
+
+        # we will need the flat inputs in the EMA update
+        flat_input = inputs.view(-1, self.embedding_dim)
+
+        # Use EMA to update the embedding vectors
+        # TODO: Move this into trainer
+        if self.training:
+            self.ema_cluster_size = self.ema_cluster_size * self.decay + (
+                1 - self._decay
+            ) * torch.sum(encodings, 0)
+
+            # Laplace smoothing of the cluster size
+            n = torch.sum(self.ema_cluster_size.data)
+            self.ema_cluster_size = (
+                (self.ema_cluster_size + self.epsilon)
+                / (n + self.ema_cluster_size * self.epsilon)
+                * n
+            )
+
+            dw = torch.matmul(encodings.t(), flat_input)
+            self.ema_w = nn.Parameter(
+                self.ema_w * self.decay + (1 - self.decay) * dw
+            )
+
+            self.codebook.weight = nn.Parameter(
+                self.ema_w / self.ema_cluster_size.unsqueeze(1)
+            )
+
+        return quantized, encodings
+        # Loss
+        e_latent_loss = F.mse_loss(quantized.detach(), inputs)
+        loss = self._commitment_cost * e_latent_loss
+
+        # Straight Through Estimator
+        quantized = inputs + (quantized - inputs).detach()
+        avg_probs = torch.mean(encodings, dim=0)
+        perplexity = torch.exp(-torch.sum(avg_probs * torch.log(avg_probs + 1e-10)))
+
+        # convert quantized from BHWC -> BCHW
+        return loss, quantized.permute(0, 3, 1, 2).contiguous(), perplexity, encodings

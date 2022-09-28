@@ -40,7 +40,7 @@ class Encoder(nn.Module):
             in_channels=hidden_dim,
             hidden_dim=residual_layer_hidden_dim,
             n_residual_layers=n_residual_layers,
-            hidden_activation_fn=hidden_activation_fn
+            hidden_activation_fn=hidden_activation_fn,
         )
         self.hidden_activation_fn = hidden_activation_fn
 

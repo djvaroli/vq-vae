@@ -11,7 +11,9 @@ class QuantizationLoss(nn.Module):
         self.mse = nn.MSELoss()
 
     def forward(
-        self, input_vectors: torch.Tensor, quantized_vectors: torch.Tensor
+        self, 
+        input_vectors: torch.Tensor, 
+        quantized_vectors: torch.Tensor
     ) -> torch.Tensor:
         encoding_latent_loss = self.mse(quantized_vectors.detach(), input_vectors)
         quantized_latent_loss = self.mse(quantized_vectors, input_vectors.detach())

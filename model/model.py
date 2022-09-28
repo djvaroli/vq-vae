@@ -35,16 +35,24 @@ class VQVAE(nn.Module):
         super(VQVAE, self).__init__()
 
         self.encoder = Encoder(
-            img_channels, hidden_dim, n_residual_layers, residual_layer_hidden_dim, hidden_activation_fn
+            img_channels,
+            hidden_dim,
+            n_residual_layers,
+            residual_layer_hidden_dim,
+            hidden_activation_fn,
         )
         self.pre_quantizer_conv = nn.Conv2d(
             in_channels=hidden_dim, out_channels=embedding_dim, kernel_size=1, stride=1
         )
         self.quantizer = VectorQuantizer(n_embeddings, embedding_dim)
         self.decoder = Decoder(
-            embedding_dim, hidden_dim, n_residual_layers, residual_layer_hidden_dim, hidden_activation_fn
+            embedding_dim,
+            hidden_dim,
+            n_residual_layers,
+            residual_layer_hidden_dim,
+            hidden_activation_fn,
         )
-    
+
     @property
     def n_codes(self) -> int:
         return self.quantizer.n_embeddings

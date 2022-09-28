@@ -9,7 +9,7 @@ class Residual(nn.Module):
         self,
         in_channels: int,
         hidden_dim: int,
-        hidden_activation_fn: nn.Module = nn.ReLU(True)
+        hidden_activation_fn: nn.Module = nn.ReLU(True),
     ):
         super(Residual, self).__init__()
         self._block = nn.Sequential(
@@ -42,15 +42,12 @@ class ResidualStack(nn.Module):
         in_channels: int,
         hidden_dim: int,
         n_residual_layers: int,
-        hidden_activation_fn: nn.Module = nn.ReLU()
+        hidden_activation_fn: nn.Module = nn.ReLU(),
     ):
         super(ResidualStack, self).__init__()
         self.n_residual_layers = n_residual_layers
         self.layers = nn.ModuleList(
-            [
-                Residual(in_channels, hidden_dim)
-                for _ in range(self.n_residual_layers)
-            ]
+            [Residual(in_channels, hidden_dim) for _ in range(self.n_residual_layers)]
         )
         self.hidden_activation_fn = hidden_activation_fn
 

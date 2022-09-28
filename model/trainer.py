@@ -17,18 +17,31 @@ class VQVAETrainer:
     def __init__(
         self,
         model: VQVAE,
-        optimizer:  torch.optim.Optimizer,
+        optimizer: torch.optim.Optimizer,
         quantization_loss_fn: nn.Module = QuantizationLoss(0.25),
         reconstruction_loss_fn: nn.Module = torch.nn.MSELoss(),
         metric_update_steps: int = 10,
+        ema_decay: float = 0.0,
         device: t.Optional[torch.device] = None,
     ) -> None:
+        """Trainer for the VQ-VAE.
+
+        Args:
+            model (VQVAE): model to train.
+            optimizer (torch.optim.Optimizer): optimizer to use during training.
+            quantization_loss_fn (nn.Module, optional): function to compute quantization loss. Defaults to QuantizationLoss(0.25).
+            reconstruction_loss_fn (nn.Module, optional): function to compute reconstruction loss. Defaults to torch.nn.MSELoss().
+            metric_update_steps (int, optional): number of steps between updates of values of computed metrics / losses. Defaults to 10.
+            ema_decay (float, optional): Decay rate for EMA update of codebook vectors. Defaults to 0.0.
+            device (t.Optional[torch.device], optional): device to train model on. Defaults to None.
+        """
         self.model = model
         self.optimizer: torch.optim.Optimizer = optimizer
         self.quantization_loss_fn = quantization_loss_fn
         self.reconstruction_loss_fn = reconstruction_loss_fn
         self.metric_update_steps = metric_update_steps
-
+        self.ema_decay = ema_decay
+        
         self.set_training_device(device)
 
         self.quantization_loss_history = list()
@@ -110,36 +123,35 @@ class VQVAETrainer:
                 run["train/QuantizationLoss"].log(float(quantization_loss_np))
                 run["train/Perplexity"].log(float(perplexity_np))
 
-    def _remote_log_reconstruction(
-        self, 
-        run: Run, 
-        epoch: int,
-        samples: torch.Tensor
-    ):
+    def _remote_log_reconstruction(self, run: Run, epoch: int, samples: torch.Tensor):
         reconstruction_id = f"reconstruction-epoch-{epoch}"
         with torch.no_grad():
             reconstructions = self.model(samples).cpu()
-        samples_and_reconstructions = torch.concat((samples.cpu(), reconstructions), dim=0)
+        samples_and_reconstructions = torch.concat(
+            (samples.cpu(), reconstructions), dim=0
+        )
 
-        grid = make_grid(samples_and_reconstructions, nrow=8, normalize=True).permute(1, 2, 0).numpy()
+        grid = (
+            make_grid(samples_and_reconstructions, nrow=8, normalize=True)
+            .permute(1, 2, 0)
+            .numpy()
+        )
         run[reconstruction_id].log(File.as_image(grid))
-    
+
     def train(
         self,
         dataloader: DataLoader,
         n_epochs: int = 1,
         neptune_run: t.Optional[Run] = None,
-        test_samples: t.Optional[torch.Tensor] = None
+        test_samples: t.Optional[torch.Tensor] = None,
     ):
         if test_samples is not None and neptune_run is not None:
-                self._remote_log_reconstruction(neptune_run, 0, test_samples)
-        
+            self._remote_log_reconstruction(neptune_run, 0, test_samples)
+
         for epoch in range(1, n_epochs + 1):
             progress_bar = tqdm(total=len(dataloader))
             progress_bar.set_description(f"Epoch {epoch} / {n_epochs}")
-            self._train_single_epoch(
-                dataloader, progress_bar, neptune_run
-            )
+            self._train_single_epoch(dataloader, progress_bar, neptune_run)
 
             if test_samples is not None and neptune_run is not None:
                 self._remote_log_reconstruction(neptune_run, epoch, test_samples)

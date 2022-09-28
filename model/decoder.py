@@ -10,7 +10,7 @@ class Decoder(nn.Module):
         hidden_dim: int,
         n_residual_layers: int,
         residual_layer_hidden_dim: int,
-        hidden_activation_fn: nn.Module = nn.ReLU()
+        hidden_activation_fn: nn.Module = nn.ReLU(),
     ):
         super(Decoder, self).__init__()
 
@@ -26,7 +26,7 @@ class Decoder(nn.Module):
             in_channels=hidden_dim,
             hidden_dim=residual_layer_hidden_dim,
             n_residual_layers=n_residual_layers,
-            hidden_activation_fn=hidden_activation_fn
+            hidden_activation_fn=hidden_activation_fn,
         )
 
         self._conv_trans_1 = nn.ConvTranspose2d(
