@@ -2,7 +2,10 @@
 
 Code adapted from [this notebook](https://colab.research.google.com/github/zalandoresearch/pytorch-vq-vae/blob/master/vq-vae.ipynb#scrollTo=qHUptm5jmleI).
 
-## STATUS: Work In Progress
+
+STATUS: Work In Progress
+
+<br/>
 
 # Setting up
 
@@ -16,6 +19,16 @@ Once the virtual environment is created you can install all necessary dependenci
 ```bash
 pip install -r requirements.txt
 ```
+
+<br/>
+
+# TODOs
+* Add support for `EMAVectorQuantizer` in the trainer class (most likely via a more generalized loss function).
+* Perform experiments on latent space
+* Add support for training an auto-regressive model on the latent space such that the VQ-VAE can be used as a generative model.
+* Experiment with super-resolution iamge generation.
+
+<br/>
 
 # Training results
 
